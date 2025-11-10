@@ -146,8 +146,7 @@ avg_estimates |>
   geom_line(aes(y = mean_est_reject, color = "Null rejected"), linetype = "dashed") +
   geom_point(aes(y = mean_est_reject, color = "Null rejected")) +
   scale_color_manual(values = c("All samples" = "darkblue", "Null rejected" = "red")) +
-  geom_abline(intercept = 0, slope = 1, linetype = "dotted") +
-  scale_x_continuous(breaks = 0:6) +
+   scale_x_continuous(breaks = 0:6) +
   labs(
     title = "Average Estimate of μ hat by True Mean (μ)",
     x = expression("True mean ("*mu*")"),
@@ -158,12 +157,100 @@ avg_estimates |>
   theme(legend.position = "bottom")
 ```
 
+The estimated average for all samples are close to the true mean showing that the estimator is not biased. However, the estimated mean average for the samples with the null being rejected is higher than the true mean at the small effect sizes. Since we tested based on the significance, so the larger effect size often had the null rejected. 
+
+
+## Problem 3
 
 
 
+```{r}
+hw5_homicides= 
+  read_csv("homicide-data.csv") |>
+  janitor::clean_names()|>
+  mutate(
+  city_state = 
+  str_c(city, state, sep = ", ")
+  )|> 
+  group_by(city)|>
+  summarize(
+    total_homicides = n(),
+    unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest")))
+    
+hw5_homicides |>
+  arrange(desc(total_homicides)) |> 
+  knitr::kable()
 
 
+```
 
+The raw dataset contains information about murders in U.S. cities, include  `r nrow(hw5_homicides)` observations and `r ncol(hw5_homicides)` variables.
+
+- `uid`: case ID
+
+- `victim_last`, `victim_first`,`victim_age`, `victim_sex`, `victim_race`: victims' information
+
+- `city`, `state`: location of the muders
+
+- `disposition`: status if the case is solved or not
+
+
+Estimate the proportion of homicides that are unsolved for the city of Baltimore, MD
+
+
+```{r}
+hw5_homicides |>
+  filter(city == "Baltimore") |>
+  summarize (
+    prop = list(prop.test(unsolved_homicides, total_homicides))
+  )|>
+  
+   mutate(
+     results = map(prop, broom::tidy)
+     )|>
+  unnest(results) |>
+  select(estimate, conf.low, conf.high)|>
+  knitr::kable(digits = 3)
+```
+
+Run the prop test for each of the cities
+
+**Now run prop.test for each of the cities in your dataset, and extract both the proportion of unsolved homicides and the confidence interval for each. Do this within a “tidy” pipeline, making use of purrr::map, purrr::map2, list columns and unnest as necessary to create a tidy dataframe with estimated proportions and CIs for each city.**
+
+```{r}
+all_city_prop=
+  hw5_homicides |> 
+   mutate(
+     test = map2(unsolved_homicides,total_homicides, ~ prop.test(x = .x, n = .y, correct = FALSE))
+    ) |> 
+  mutate(tidy_test = map(test, broom::tidy)) |> 
+  select(city, tidy_test) |> 
+  unnest(cols = tidy_test) |> 
+  select(city, estimate, conf.low, conf.high) |> 
+  arrange(estimate) 
+ 
+all_city_prop |>  knitr::kable(digits = 4)
+
+```
+Plot the proportions
+```{r}
+all_city_prop |> 
+  mutate(city = factor(city, levels = city)) |> 
+  ggplot(aes(x = city, y = estimate)) +
+  geom_point(color = "blue", size = 1) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.3) +
+  labs(
+    x = "City",
+    y = "Proportion of Unsolved Homicides",
+    title = "Proportion of Unsolved Homicides"
+  ) +  
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1)
+  )
+```
+
+The graph showed the states with low proportion of unsolved cases are Richmond and Charlotte with less than 30% cases are unsolved. The city with the highest proportion of unsolved cases is Chicago 73%. 
 
 
 
