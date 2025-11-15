@@ -12,7 +12,7 @@ set.seed(1)
 knitr::opts_chunk$set(
 	echo = TRUE,
 	warning = FALSE,
-  fig.width = 6,
+  fig.width = 8,
   fig.asp = .6,
   out.width = "90%"
 )
@@ -63,7 +63,8 @@ Plot this
 bday_sim_results |>
   ggplot(aes( x= bdays, y = prob_repeat)) +
    geom_line(color = "blue") +
-   geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
+  geom_point()+
+     geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
   labs(title = "Probability of Shared Birthday vs Group Size",
        x = "Group Size",
        y = "Probability of Shared Birthday") +
@@ -132,8 +133,8 @@ avg_estimates =
   t_test_results |>
   group_by(mu) |>
   summarize(
-    mean_est_all = mean(estimate),
-    mean_est_reject = mean(estimate[reject_null]),
+    mean_mu_all = mean(estimate),
+    mean_mu_reject = mean(estimate[reject_null]),
     .groups = "drop"
   )
 ```
@@ -141,10 +142,10 @@ avg_estimates =
 ```{r}
 avg_estimates |>
   ggplot(aes(x = mu)) +
-  geom_line(aes(y = mean_est_all, color = "All samples")) +
-  geom_point(aes(y = mean_est_all, color = "All samples")) +
-  geom_line(aes(y = mean_est_reject, color = "Null rejected"), linetype = "dashed") +
-  geom_point(aes(y = mean_est_reject, color = "Null rejected")) +
+  geom_line(aes(y = mean_mu_all, color = "All samples")) +
+  geom_point(aes(y = mean_mu_all, color = "All samples")) +
+  geom_line(aes(y = mean_mu_reject, color = "Null rejected"), linetype = "dashed") +
+  geom_point(aes(y = mean_mu_reject, color = "Null rejected")) +
   scale_color_manual(values = c("All samples" = "darkblue", "Null rejected" = "red")) +
    scale_x_continuous(breaks = 0:6) +
   labs(
@@ -165,13 +166,15 @@ The estimated average for all samples are close to the true mean showing that th
 
 
 ```{r}
-hw5_homicides= 
+hw5_data= 
   read_csv("homicide-data.csv") |>
   janitor::clean_names()|>
   mutate(
   city_state = 
   str_c(city, state, sep = ", ")
-  )|> 
+  )
+hw5_homicides =
+  hw5_data|> 
   group_by(city)|>
   summarize(
     total_homicides = n(),
@@ -215,15 +218,15 @@ hw5_homicides |>
 
 Run the prop test for each of the cities
 
-**Now run prop.test for each of the cities in your dataset, and extract both the proportion of unsolved homicides and the confidence interval for each. Do this within a “tidy” pipeline, making use of purrr::map, purrr::map2, list columns and unnest as necessary to create a tidy dataframe with estimated proportions and CIs for each city.**
+
 
 ```{r}
 all_city_prop=
   hw5_homicides |> 
    mutate(
-     test = map2(unsolved_homicides,total_homicides, ~ prop.test(x = .x, n = .y, correct = FALSE))
+     prop = map2(unsolved_homicides,total_homicides, ~ prop.test(x = .x, n = .y, correct = FALSE))
     ) |> 
-  mutate(tidy_test = map(test, broom::tidy)) |> 
+  mutate(tidy_test = map(prop, broom::tidy)) |> 
   select(city, tidy_test) |> 
   unnest(cols = tidy_test) |> 
   select(city, estimate, conf.low, conf.high) |> 
@@ -245,12 +248,23 @@ all_city_prop |>
     title = "Proportion of Unsolved Homicides"
   ) +  
   theme_minimal() +
+  coord_flip()+
   theme(
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1)
+    axis.text.y = element_text(size = 4)
   )
 ```
 
 The graph showed the states with low proportion of unsolved cases are Richmond and Charlotte with less than 30% cases are unsolved. The city with the highest proportion of unsolved cases is Chicago 73%. 
+Note that when I grouped the city_state there was 583 cases in Tulsa, OK and one Tulsa, AL. Since there was no Tulsa city in AL, I chose to group by the city instead. I did not correct the data for the state. 
+```{r}
+hw5_data |>
+  select(city, state, city_state)|>
+  filter(city == "Tulsa")|>
+  group_by(city_state)|>
+  count()
+
+```
+
 
 
 
